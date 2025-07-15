@@ -256,7 +256,7 @@
             <div class="firebase-controls">
                 <label for="record-selector">Seleccionar un registro para ver o editar (por Nº Trasplante):</label>
                 <select id="record-selector">
-                    <option value="">-- Nuevo Registro --</option>
+                    <!-- Options will be populated by JavaScript -->
                 </select>
                 <div id="status-message"></div>
             </div>
@@ -598,38 +598,37 @@
         function listenToRecords() {
             if (recordsUnsubscribe) recordsUnsubscribe();
             
-            // Using a public path "donantes" for all users
             const recordsCol = collection(db, "donantes");
 
             recordsUnsubscribe = onSnapshot(query(recordsCol), (querySnapshot) => {
                 const selector = document.getElementById('record-selector');
                 const currentSelection = selector.value;
-                selector.innerHTML = '<option value="">-- Nuevo Registro --</option>';
+                
                 const records = [];
                 querySnapshot.forEach((doc) => {
                     records.push({ id: doc.id, data: doc.data() });
                 });
                 
-                // Sort by transplant number (as a number)
                 records.sort((a, b) => {
                     const numA = parseInt(a.data['numero-trasplante'], 10) || 0;
                     const numB = parseInt(b.data['numero-trasplante'], 10) || 0;
                     if (numB !== numA) return numB - numA;
-                    // Fallback to creation date for records without a number
                     return (b.data.createdAt?.toMillis() || 0) - (a.data.createdAt?.toMillis() || 0);
                 });
 
+                let optionsHTML = '';
                 records.forEach(record => {
-                    const option = document.createElement('option');
-                    option.value = record.id;
                     const numTrasplante = record.data['numero-trasplante'] || 'Sin Nº';
                     const date = record.data.createdAt?.toDate ? record.data.createdAt.toDate().toLocaleDateString('es-ES') : 'Sin fecha';
-                    option.textContent = `Nº: ${numTrasplante} (${date})`;
-                    selector.appendChild(option);
+                    optionsHTML += `<option value="${record.id}">Nº: ${numTrasplante} (${date})</option>`;
                 });
+
+                selector.innerHTML = optionsHTML;
                 
                 if (Array.from(selector.options).some(opt => opt.value === currentSelection)) {
                     selector.value = currentSelection;
+                } else {
+                   selector.value = ""; // Clear selection if the previously selected item is gone
                 }
             }, (error) => {
                 console.error("Error listening to records:", error);
@@ -652,7 +651,7 @@
         }
 
         function populateForm(data) {
-            resetForm(); // Start with a clean slate
+            resetForm(); 
             allFormElements.forEach(el => {
                 if (el.id && data[el.id] !== undefined) {
                     if (el.type === 'checkbox') {
@@ -663,7 +662,6 @@
                     }
                 }
             });
-            // Recalculate computed fields
             document.getElementById('peso').dispatchEvent(new Event('input'));
             document.getElementById('fecha-nacimiento').dispatchEvent(new Event('change'));
             document.getElementById('fecha-ingreso-uci').dispatchEvent(new Event('change'));
@@ -672,12 +670,15 @@
         async function handleLoadRecord() {
             const selector = document.getElementById('record-selector');
             const docId = selector.value;
-            currentRecordId = docId;
-
+            
             if (!docId) {
+                // This case should ideally not happen if the user selects from the list,
+                // but as a fallback, we can clear the form.
                 resetForm();
                 return;
             }
+            
+            currentRecordId = docId;
             
             try {
                 showStatus("Cargando registro...", 'info', 0);
