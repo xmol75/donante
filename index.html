@@ -21,6 +21,7 @@
             --border-color: #bdc3c7;
             --filled-color: #e8f0fe;
             --danger-color: #c0392b;
+            --danger-hover-color: #a93226;
             --action-color: #27ae60;
             --success-color: #27ae60;
             --warning-color: #f39c12;
@@ -215,7 +216,7 @@
         }
 
         .action-buttons button {
-            flex: 1 1 200px; /* Allow wrapping on small screens */
+            flex: 1 1 150px; /* Allow wrapping on small screens */
             padding: 15px;
             font-size: 1.1em;
             font-weight: bold;
@@ -228,12 +229,60 @@
 
         #save-record-button { background-color: var(--success-color); }
         #save-record-button:hover { background-color: #229954; }
-        #generate-pdf-button { background-color: var(--action-color); }
+        #generate-pdf-button { background-color: var(--secondary-color); }
         #generate-pdf-button:hover { background-color: #2980b9; }
         #reset-button { background-color: var(--warning-color); }
         #reset-button:hover { background-color: #d68910; }
+        #delete-record-button { background-color: var(--danger-color); }
+        #delete-record-button:hover { background-color: var(--danger-hover-color); }
 
         .hidden { display: none; }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            font-size: 1.4em;
+            color: var(--primary-color);
+        }
+        .modal-content p {
+            margin-bottom: 25px;
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 5px;
+            border: none;
+            font-size: 1em;
+            cursor: pointer;
+            color: white;
+        }
+        #confirm-delete-btn { background-color: var(--danger-color); }
+        #confirm-delete-btn:hover { background-color: var(--danger-hover-color); }
+        #cancel-delete-btn { background-color: #6c757d; }
+        #cancel-delete-btn:hover { background-color: #5a6268; }
+
 
         /* Responsive */
         @media (max-width: 600px) {
@@ -524,6 +573,7 @@
                 <div class="action-buttons">
                     <button type="button" id="save-record-button">Guardar Registro</button>
                     <button type="button" id="generate-pdf-button">Generar PDF</button>
+                    <button type="button" id="delete-record-button">Borrar Registro</button>
                     <button type="button" id="reset-button">Limpiar para Nuevo Registro</button>
                 </div>
 
@@ -535,11 +585,23 @@
         </footer>
     </div>
     
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Confirmar Borrado</h3>
+            <p>¿Está seguro de que desea borrar este registro de forma permanente? Esta acción no se puede deshacer.</p>
+            <div class="modal-buttons">
+                <button id="cancel-delete-btn">Cancelar</button>
+                <button id="confirm-delete-btn">Sí, Borrar</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         // Firebase Imports from v11.10.0
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, onSnapshot, collection, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, deleteDoc, onSnapshot, collection, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
         // --- CONFIGURATION ---
         const firebaseConfig = {
@@ -558,6 +620,9 @@
         let recordsUnsubscribe = null;
         const form = document.getElementById('donante-form');
         const allFormElements = form.querySelectorAll('input, select, textarea');
+        const deleteModal = document.getElementById('delete-modal');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
 
         // --- FIREBASE INITIALIZATION ---
         async function initializeFirebase() {
@@ -616,7 +681,7 @@
                     return (b.data.createdAt?.toMillis() || 0) - (a.data.createdAt?.toMillis() || 0);
                 });
 
-                let optionsHTML = '';
+                let optionsHTML = '<option value="">-- Seleccione un registro --</option>';
                 records.forEach(record => {
                     const numTrasplante = record.data['numero-trasplante'] || 'Sin Nº';
                     const date = record.data.createdAt?.toDate ? record.data.createdAt.toDate().toLocaleDateString('es-ES') : 'Sin fecha';
@@ -628,7 +693,7 @@
                 if (Array.from(selector.options).some(opt => opt.value === currentSelection)) {
                     selector.value = currentSelection;
                 } else {
-                   selector.value = ""; // Clear selection if the previously selected item is gone
+                   selector.value = ""; 
                 }
             }, (error) => {
                 console.error("Error listening to records:", error);
@@ -672,8 +737,6 @@
             const docId = selector.value;
             
             if (!docId) {
-                // This case should ideally not happen if the user selects from the list,
-                // but as a fallback, we can clear the form.
                 resetForm();
                 return;
             }
@@ -706,7 +769,7 @@
                     // Update
                     const docRef = doc(db, "donantes", currentRecordId);
                     await setDoc(docRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
-                    showStatus(`Registro Nº ${data['numero-trasplante']} actualizado correctamente.`, 'success');
+                    showStatus(`Registro Nº ${data['numero-trasplante'] || ''} actualizado correctamente.`, 'success');
                 } else {
                     // Create
                     const docRef = await addDoc(collection(db, "donantes"), {
@@ -714,12 +777,34 @@
                         createdAt: serverTimestamp()
                     });
                     currentRecordId = docRef.id;
-                    document.getElementById('record-selector').value = currentRecordId;
+                    // The onSnapshot listener will automatically update and select the new record.
                     showStatus(`Nuevo registro Nº ${data['numero-trasplante'] || '(sin número)'} guardado con éxito.`, 'success');
                 }
             } catch (error) {
                 console.error("Error saving record: ", error);
                 showStatus("Error al guardar los datos.", 'error');
+            }
+        }
+
+        function handleDeleteRecord() {
+            if (!currentRecordId) {
+                showStatus("Por favor, seleccione un registro de la lista para borrarlo.", 'error');
+                return;
+            }
+            deleteModal.classList.remove('hidden');
+        }
+        
+        async function confirmDelete() {
+            if (!currentRecordId) return;
+            try {
+                await deleteDoc(doc(db, "donantes", currentRecordId));
+                showStatus("Registro borrado con éxito.", 'success');
+                resetForm();
+            } catch (error) {
+                console.error("Error deleting record: ", error);
+                showStatus("Error al borrar el registro.", 'error');
+            } finally {
+                deleteModal.classList.add('hidden');
             }
         }
 
@@ -822,6 +907,10 @@
             document.getElementById('save-record-button').addEventListener('click', handleSaveRecord);
             document.getElementById('generate-pdf-button').addEventListener('click', generatePDF);
             document.getElementById('reset-button').addEventListener('click', resetForm);
+            document.getElementById('delete-record-button').addEventListener('click', handleDeleteRecord);
+            confirmDeleteBtn.addEventListener('click', confirmDelete);
+            cancelDeleteBtn.addEventListener('click', () => deleteModal.classList.add('hidden'));
+
         });
 
         function resetForm() {
