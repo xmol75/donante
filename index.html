@@ -267,7 +267,7 @@
                 <button type="button" class="accordion-button active">Datos Generales del Donante</button>
                 <div class="accordion-panel" style="max-height: fit-content;">
                     <div class="form-grid">
-                        <div class="form-group"><label for="numero-trasplante">Nº Trasplante:</label><input type="text" id="numero-trasplante" required></div>
+                        <div class="form-group"><label for="numero-trasplante">Nº Trasplante:</label><input type="text" id="numero-trasplante"></div>
                         <div class="form-group"><label for="nhc">NHC:</label><input type="text" id="nhc"></div>
                         <div class="form-group"><label for="fecha">Fecha Extracción:</label><input type="date" id="fecha"></div>
                         <div class="form-group"><label for="hora">Hora Extracción:</label><input type="time" id="hora"></div>
@@ -598,8 +598,8 @@
         function listenToRecords() {
             if (recordsUnsubscribe) recordsUnsubscribe();
             
-            // Using a public path "registros-donantes" for all users
-            const recordsCol = collection(db, "registros-donantes");
+            // Using a public path "donantes" for all users
+            const recordsCol = collection(db, "donantes");
 
             recordsUnsubscribe = onSnapshot(query(recordsCol), (querySnapshot) => {
                 const selector = document.getElementById('record-selector');
@@ -681,7 +681,7 @@
             
             try {
                 showStatus("Cargando registro...", 'info', 0);
-                const docRef = doc(db, "registros-donantes", docId);
+                const docRef = doc(db, "donantes", docId);
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
@@ -698,30 +698,23 @@
         }
 
         async function handleSaveRecord() {
-            const numTrasplanteInput = document.getElementById('numero-trasplante');
-            if (!numTrasplanteInput.value) {
-                showStatus("El campo 'Nº Trasplante' es obligatorio para guardar.", 'error');
-                numTrasplanteInput.focus();
-                return;
-            }
-
             const data = getFormData();
             
             try {
                 if (currentRecordId) {
                     // Update
-                    const docRef = doc(db, "registros-donantes", currentRecordId);
+                    const docRef = doc(db, "donantes", currentRecordId);
                     await setDoc(docRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
                     showStatus(`Registro Nº ${data['numero-trasplante']} actualizado correctamente.`, 'success');
                 } else {
                     // Create
-                    const docRef = await addDoc(collection(db, "registros-donantes"), {
+                    const docRef = await addDoc(collection(db, "donantes"), {
                         ...data,
                         createdAt: serverTimestamp()
                     });
                     currentRecordId = docRef.id;
                     document.getElementById('record-selector').value = currentRecordId;
-                    showStatus(`Nuevo registro Nº ${data['numero-trasplante']} guardado con éxito.`, 'success');
+                    showStatus(`Nuevo registro Nº ${data['numero-trasplante'] || '(sin número)'} guardado con éxito.`, 'success');
                 }
             } catch (error) {
                 console.error("Error saving record: ", error);
