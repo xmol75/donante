@@ -98,7 +98,6 @@
         #status-message.error { background-color: #f8d7da; color: #721c24; display: block; }
         #status-message.info { background-color: #cce5ff; color: #004085; display: block; }
 
-
         /* Acordeón */
         .accordion-button {
             background-color: var(--secondary-color);
@@ -255,7 +254,7 @@
         <main>
             <!-- Controles de Firebase -->
             <div class="firebase-controls">
-                <label for="record-selector">Seleccionar un registro para ver o editar:</label>
+                <label for="record-selector">Seleccionar un registro para ver o editar (por Nº Trasplante):</label>
                 <select id="record-selector">
                     <option value="">-- Nuevo Registro --</option>
                 </select>
@@ -268,7 +267,8 @@
                 <button type="button" class="accordion-button active">Datos Generales del Donante</button>
                 <div class="accordion-panel" style="max-height: fit-content;">
                     <div class="form-grid">
-                        <div class="form-group"><label for="nhc">NHC:</label><input type="text" id="nhc" required></div>
+                        <div class="form-group"><label for="numero-trasplante">Nº Trasplante:</label><input type="text" id="numero-trasplante" required></div>
+                        <div class="form-group"><label for="nhc">NHC:</label><input type="text" id="nhc"></div>
                         <div class="form-group"><label for="fecha">Fecha Extracción:</label><input type="date" id="fecha"></div>
                         <div class="form-group"><label for="hora">Hora Extracción:</label><input type="time" id="hora"></div>
                         <div class="form-group"><label for="grupo-sanguineo">Grupo Sanguíneo:</label><select id="grupo-sanguineo"><option value="" disabled selected>Seleccione...</option><option value="O">O</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option></select></div>
@@ -536,18 +536,24 @@
     </div>
     
     <script type="module">
-        // Firebase Imports
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, onSnapshot, collection, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Firebase Imports from v11.10.0
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, onSnapshot, collection, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
         // --- CONFIGURATION ---
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const firebaseConfig = {
+           apiKey: "AIzaSyA3uEWP3_Dq4-zhDCPGBiCD64jrxj6IIj0",
+           authDomain: "donantes-ba904.firebaseapp.com",
+           projectId: "donantes-ba904",
+           storageBucket: "donantes-ba904.firebasestorage.app",
+           messagingSenderId: "643883796115",
+           appId: "1:643883796115:web:90e5d72d547612ca4eef66",
+           measurementId: "G-46TN5V2RTD"
+        };
         
         // --- APP STATE ---
-        let db, auth, userId;
+        let db, auth;
         let currentRecordId = null;
         let recordsUnsubscribe = null;
         const form = document.getElementById('donante-form');
@@ -559,14 +565,16 @@
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
-                await setPersistence(auth, browserLocalPersistence);
-                onAuthStateChanged(auth, async (user) => {
+                
+                onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        userId = user.uid;
-                        console.log("User authenticated with UID:", userId);
+                        console.log("User authenticated anonymously with UID:", user.uid);
                         listenToRecords();
                     } else {
-                        await authenticateUser();
+                        signInAnonymously(auth).catch((error) => {
+                            console.error("Anonymous sign-in failed:", error);
+                            showStatus("Error de autenticación.", 'error');
+                        });
                     }
                 });
             } catch (error) {
@@ -574,25 +582,13 @@
                 showStatus("Error: No se pudo conectar a la base de datos.", 'error');
             }
         }
-        
-        async function authenticateUser() {
-            try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Authentication failed:", error);
-                showStatus("Error de autenticación.", 'error');
-            }
-        }
 
         // --- UI & STATUS ---
         function showStatus(message, type = 'info', duration = 4000) {
             const statusEl = document.getElementById('status-message');
             statusEl.textContent = message;
-            statusEl.className = type; // 'success', 'error', 'info'
+            statusEl.className = type;
+            statusEl.style.display = 'block';
             if (duration > 0) {
                 setTimeout(() => { statusEl.style.display = 'none'; }, duration);
             }
@@ -601,12 +597,11 @@
         // --- DATA HANDLING ---
         function listenToRecords() {
             if (recordsUnsubscribe) recordsUnsubscribe();
-            if (!userId) return;
+            
+            // Using a public path "registros-donantes" for all users
+            const recordsCol = collection(db, "registros-donantes");
 
-            const recordsCol = collection(db, `artifacts/${appId}/users/${userId}/donors`);
-            const q = query(recordsCol);
-
-            recordsUnsubscribe = onSnapshot(q, (querySnapshot) => {
+            recordsUnsubscribe = onSnapshot(query(recordsCol), (querySnapshot) => {
                 const selector = document.getElementById('record-selector');
                 const currentSelection = selector.value;
                 selector.innerHTML = '<option value="">-- Nuevo Registro --</option>';
@@ -615,14 +610,21 @@
                     records.push({ id: doc.id, data: doc.data() });
                 });
                 
-                records.sort((a, b) => (b.data.createdAt?.toMillis() || 0) - (a.data.createdAt?.toMillis() || 0));
+                // Sort by transplant number (as a number)
+                records.sort((a, b) => {
+                    const numA = parseInt(a.data['numero-trasplante'], 10) || 0;
+                    const numB = parseInt(b.data['numero-trasplante'], 10) || 0;
+                    if (numB !== numA) return numB - numA;
+                    // Fallback to creation date for records without a number
+                    return (b.data.createdAt?.toMillis() || 0) - (a.data.createdAt?.toMillis() || 0);
+                });
 
                 records.forEach(record => {
                     const option = document.createElement('option');
                     option.value = record.id;
-                    const nhc = record.data.nhc || 'Sin NHC';
+                    const numTrasplante = record.data['numero-trasplante'] || 'Sin Nº';
                     const date = record.data.createdAt?.toDate ? record.data.createdAt.toDate().toLocaleDateString('es-ES') : 'Sin fecha';
-                    option.textContent = `${date} - NHC: ${nhc}`;
+                    option.textContent = `Nº: ${numTrasplante} (${date})`;
                     selector.appendChild(option);
                 });
                 
@@ -655,7 +657,6 @@
                 if (el.id && data[el.id] !== undefined) {
                     if (el.type === 'checkbox') {
                         el.checked = data[el.id];
-                        // Trigger change event to show/hide conditional fields
                         el.dispatchEvent(new Event('change'));
                     } else {
                         el.value = data[el.id];
@@ -680,12 +681,12 @@
             
             try {
                 showStatus("Cargando registro...", 'info', 0);
-                const docRef = doc(db, `artifacts/${appId}/users/${userId}/donors`, docId);
+                const docRef = doc(db, "registros-donantes", docId);
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
                     populateForm(docSnap.data());
-                    showStatus(`Registro ${docSnap.data().nhc || ''} cargado.`, 'success');
+                    showStatus(`Registro Nº ${docSnap.data()['numero-trasplante'] || ''} cargado.`, 'success');
                 } else {
                     showStatus("El registro seleccionado ya no existe.", 'error');
                     resetForm();
@@ -697,10 +698,10 @@
         }
 
         async function handleSaveRecord() {
-            const nhcInput = document.getElementById('nhc');
-            if (!nhcInput.value) {
-                showStatus("El campo 'NHC' es obligatorio para guardar.", 'error');
-                nhcInput.focus();
+            const numTrasplanteInput = document.getElementById('numero-trasplante');
+            if (!numTrasplanteInput.value) {
+                showStatus("El campo 'Nº Trasplante' es obligatorio para guardar.", 'error');
+                numTrasplanteInput.focus();
                 return;
             }
 
@@ -709,18 +710,18 @@
             try {
                 if (currentRecordId) {
                     // Update
-                    const docRef = doc(db, `artifacts/${appId}/users/${userId}/donors`, currentRecordId);
+                    const docRef = doc(db, "registros-donantes", currentRecordId);
                     await setDoc(docRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
-                    showStatus(`Registro ${data.nhc} actualizado correctamente.`, 'success');
+                    showStatus(`Registro Nº ${data['numero-trasplante']} actualizado correctamente.`, 'success');
                 } else {
                     // Create
-                    const docRef = await addDoc(collection(db, `artifacts/${appId}/users/${userId}/donors`), {
+                    const docRef = await addDoc(collection(db, "registros-donantes"), {
                         ...data,
                         createdAt: serverTimestamp()
                     });
                     currentRecordId = docRef.id;
                     document.getElementById('record-selector').value = currentRecordId;
-                    showStatus(`Nuevo registro ${data.nhc} guardado con éxito.`, 'success');
+                    showStatus(`Nuevo registro Nº ${data['numero-trasplante']} guardado con éxito.`, 'success');
                 }
             } catch (error) {
                 console.error("Error saving record: ", error);
@@ -738,9 +739,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            initializeFirebase(); // Iniciar Firebase
+            initializeFirebase();
 
-            // Lógica del Acordeón
             const accordions = document.getElementsByClassName("accordion-button");
             for (let i = 0; i < accordions.length; i++) {
                 accordions[i].addEventListener("click", function() {
@@ -754,7 +754,6 @@
                 });
             }
 
-            // --- CÁLCULOS AUTOMÁTICOS ---
             const pesoInput = document.getElementById('peso');
             const alturaInput = document.getElementById('altura');
             const imcInput = document.getElementById('imc');
@@ -802,7 +801,6 @@
             fechaIngresoUCIInput.addEventListener('change', calcularDiasUCI);
             fechaExtraccionInput.addEventListener('change', calcularDiasUCI);
 
-            // Lógica para mostrar/ocultar detalles
             const setupConditionalDisplay = (checkboxId, containerId) => {
                 const checkbox = document.getElementById(checkboxId);
                 const container = document.getElementById(containerId);
@@ -826,7 +824,6 @@
                 }
             });
 
-            // --- EVENT LISTENERS PARA BOTONES ---
             document.getElementById('record-selector').addEventListener('change', handleLoadRecord);
             document.getElementById('save-record-button').addEventListener('click', handleSaveRecord);
             document.getElementById('generate-pdf-button').addEventListener('click', generatePDF);
@@ -835,23 +832,18 @@
 
         function resetForm() {
             document.getElementById('donante-form').reset();
-            // Resetear estado de la app
             currentRecordId = null;
             document.getElementById('record-selector').value = "";
-            // Ocultar campos condicionales
             document.querySelectorAll('.hidden').forEach(el => {
                 if(el.id.includes('-container') || el.id.includes('-duracion') || el.id.includes('-temp')){
                     el.classList.add('hidden');
                 }
             });
-            // Limpiar campos calculados
             ['imc', 'dias-uci', 'edad'].forEach(id => document.getElementById(id).value = '');
             showStatus("Formulario limpio, listo para un nuevo registro.", 'info');
         }
 
-        // --- LÓGICA DE GENERACIÓN DE PDF CON JSPDF (SIN CAMBIOS) ---
         function generatePDF() {
-            // ... (El código de generación de PDF del usuario se pega aquí sin cambios)
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
             
@@ -910,8 +902,6 @@
                     .join(', ') || '';
             };
 
-            // --- CONSTRUCCIÓN DEL PDF ---
-
             doc.setFontSize(14).setFont(undefined, 'bold').setTextColor(textColor).text("Unidad de Cirugía Hepatobiliar y Trasplante Hepático", 105, y, { align: 'center' });
             y += 6;
             doc.setFontSize(12).setFont(undefined, 'normal').setTextColor(textColor).text("Hospital Universitario Son Espases", 105, y, { align: 'center' });
@@ -923,18 +913,21 @@
 
             addTitle("Datos Generales del Donante");
             let y1 = y; let y2 = y;
+            y1 = addLine("Nº Trasplante:", getValue('numero-trasplante'), x, y1);
             y1 = addLine("NHC:", getValue('nhc'), x, y1);
             y1 = addLine("Fecha Nacimiento:", formateaFecha(getValue('fecha-nacimiento')), x, y1);
             y1 = addLine("Edad:", getValue('edad') + ' años', x, y1);
+            y1 = addLine("Sexo:", getValue('sexo'), x, y1);
             y1 = addLine("Peso:", getValue('peso') + ' kg', x, y1);
-            y1 = addLine("IMC:", getValue('imc') + ' kg/m²', x, y1);
-            y1 = addLine("H. Origen:", getValue('hospital-origen'), x, y1);
+            y1 = addLine("Altura:", getValue('altura') + ' cm', x, y1);
 
-            y2 = addLine("Fecha/Hora Ext.:", `${formateaFecha(getValue('fecha'))} ${getValue('hora')}`, x2, y2);
-            y2 = addLine("Sexo:", getValue('sexo'), x2, y2);
-            y2 = addLine("Altura:", getValue('altura') + ' cm', x2, y2);
-            y2 = addLine("Grupo/RH:", `${getValue('grupo-sanguineo')} ${getValue('rh')}`, x2, y2);
-            y2 = addLine("H. Receptor:", getValue('hospital-receptor'), x2, y2);
+            y2 = addLine("Fecha Extracción:", formateaFecha(getValue('fecha')), x2, y2);
+            y2 = addLine("Hora Extracción:", getValue('hora'), x2, y2);
+            y2 = addLine("Grupo Sanguíneo:", getValue('grupo-sanguineo'), x2, y2);
+            y2 = addLine("RH:", getValue('rh'), x2, y2);
+            y2 = addLine("IMC:", getValue('imc') + ' kg/m²', x2, y2);
+            y2 = addLine("Hospital Origen:", getValue('hospital-origen'), x2, y2);
+            y2 = addLine("Hospital Receptor:", getValue('hospital-receptor'), x2, y2);
             y = Math.max(y1, y2);
 
             addTitle("Antecedentes y Fechas Clave");
@@ -1052,7 +1045,7 @@
             y2 = addLine("Después de perfusión:", getValue('val-despues'), x2, y2);
             y = Math.max(y1, y2);
 
-            checkY(150); // Check if there is enough space for the next sections
+            checkY(150);
 
             addTitle("Perfusión, Banco e Incidencias");
             y = addLine("Perfusión:", getValue('perfusion-resultado'));
@@ -1088,17 +1081,13 @@
             y2 = addLine("Órgano en nevera:", getValue('t-as-nevera'), x2, y2);
             y = Math.max(y1, y2);
 
-            checkY(40);
-            y = pageHeight - 40;
-            addLine("Firma del cirujano:", "_________________________");
-
             const pageCount = doc.internal.getNumberOfPages();
             for(let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
                 doc.setFontSize(8).setTextColor(150).text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
             }
 
-            doc.save(`donante_${getValue('nhc') || 'SIN_NHC'}.pdf`);
+            doc.save(`donante_${getValue('numero-trasplante') || getValue('nhc') || 'SIN_ID'}.pdf`);
             showStatus("PDF generado con éxito", "success");
         }
     </script>
