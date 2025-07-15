@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Donante Hepático con Base de Datos</title>
+    
+    <!-- LIBRERÍA jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        /* CSS Original del Usuario */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --background-color: #ecf0f1;
+            --surface-color: #ffffff;
+            --text-color: #2c3e50;
+            --border-color: #bdc3c7;
+            --filled-color: #e8f0fe;
+            --danger-color: #c0392b;
+            --action-color: #27ae60;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+        }
+        .app-container {
+            background-color: var(--surface-color);
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.5em;
+        }
+        header p { margin: 5px 0 0; opacity: 0.9; }
+        main { padding: 20px; }
+        footer {
+            background-color: #f0f0f0;
+            color: #7f8c8d;
+            padding: 15px;
+            text-align: center;
+            font-size: 0.8em;
+            border-radius: 0 0 8px 8px;
+        }
+
+        /* Controles de Firebase */
+        .firebase-controls {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .firebase-controls label {
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .firebase-controls select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+        #status-message {
+            text-align: center;
+            padding: 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: none; /* Oculto por defecto */
+        }
+        #status-message.success { background-color: #d4edda; color: #155724; display: block; }
+        #status-message.error { background-color: #f8d7da; color: #721c24; display: block; }
+        #status-message.info { background-color: #cce5ff; color: #004085; display: block; }
+
+
+        /* Acordeón */
+        .accordion-button {
+            background-color: var(--secondary-color);
+            color: white;
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            text-align: left;
+            border: none;
+            outline: none;
+            transition: 0.4s;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-top: 10px;
+            border-radius: 5px;
+        }
+        .accordion-button:hover, .accordion-button.active {
+            background-color: #2980b9;
+        }
+        .accordion-button::after {
+            content: '+';
+            font-size: 1.5em;
+            color: white;
+            float: right;
+            margin-left: 5px;
+            line-height: 1;
+        }
+        .accordion-button.active::after { content: "−"; }
+        .accordion-panel {
+            padding: 0 18px;
+            background-color: white;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            margin-bottom: 10px;
+        }
+        .accordion-panel > .form-section { padding-top: 20px; }
+
+        .form-section {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--background-color);
+        }
+        .form-section:last-child { border-bottom: none; padding-bottom: 0; }
+        .form-section h3 { font-size: 1.1em; color: var(--primary-color); margin-top: 0; margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box;
+            background-color: #fff;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .form-group textarea { resize: vertical; }
+
+        /* Estilo para campos rellenados */
+        .form-group input:not([readonly]):valid,
+        .form-group select:valid,
+        .form-group textarea:valid {
+            background-color: var(--filled-color);
+            border-color: var(--secondary-color);
+        }
+        select:invalid { color: #666; }
+
+        /* Checkboxes */
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .form-group.checkbox {
+            display: flex;
+            align-items: center;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .form-group.checkbox input { width: auto; margin-right: 10px; }
+        .form-group.checkbox label { margin-bottom: 0; font-weight: normal; }
+        .checkbox-group-inline {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .checkbox-group-inline label { flex-shrink: 0; }
+        .checkbox-group-inline input[type="number"] { flex-grow: 1; min-width: 100px; }
+
+        /* Grids para campos */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .form-grid-dynamic {
+            display: grid;
+            grid-template-columns: repeat(var(--cols, 2), 1fr);
+            gap: 15px;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .action-buttons button {
+            flex: 1 1 200px; /* Allow wrapping on small screens */
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        #save-record-button { background-color: var(--success-color); }
+        #save-record-button:hover { background-color: #229954; }
+        #generate-pdf-button { background-color: var(--action-color); }
+        #generate-pdf-button:hover { background-color: #2980b9; }
+        #reset-button { background-color: var(--warning-color); }
+        #reset-button:hover { background-color: #d68910; }
+
+        .hidden { display: none; }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            header h1 { font-size: 1.3em; }
+            main { padding: 15px; }
+            .form-grid-dynamic { --cols: 2 !important; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Registro de Datos - Extracción Hepática</h1>
+            <p>Gestión de informes con guardado en la nube.</p>
+        </header>
+        
+        <main>
+            <!-- Controles de Firebase -->
+            <div class="firebase-controls">
+                <label for="record-selector">Seleccionar un registro para ver o editar:</label>
+                <select id="record-selector">
+                    <option value="">-- Nuevo Registro --</option>
+                </select>
+                <div id="status-message"></div>
+            </div>
+
+            <form id="donante-form">
+                
+                <!-- Contenido del formulario original -->
+                <button type="button" class="accordion-button active">Datos Generales del Donante</button>
+                <div class="accordion-panel" style="max-height: fit-content;">
+                    <div class="form-grid">
+                        <div class="form-group"><label for="nhc">NHC:</label><input type="text" id="nhc" required></div>
+                        <div class="form-group"><label for="fecha">Fecha Extracción:</label><input type="date" id="fecha"></div>
+                        <div class="form-group"><label for="hora">Hora Extracción:</label><input type="time" id="hora"></div>
+                        <div class="form-group"><label for="grupo-sanguineo">Grupo Sanguíneo:</label><select id="grupo-sanguineo"><option value="" disabled selected>Seleccione...</option><option value="O">O</option><option value="A">A</option><option value="B">B</option><option value="AB">AB</option></select></div>
+                        <div class="form-group"><label for="rh">RH:</label><select id="rh"><option value="" disabled selected>Seleccione...</option><option value="+">+</option><option value="-">-</option></select></div>
+                        <div class="form-group"><label for="fecha-nacimiento">Fecha de Nacimiento:</label><input type="date" id="fecha-nacimiento"></div>
+                        <div class="form-group"><label for="edad">Edad:</label><input type="number" step="any" id="edad" readonly></div>
+                        <div class="form-group"><label for="sexo">Sexo:</label><select id="sexo"><option value="" disabled selected>Seleccione...</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option></select></div>
+                        <div class="form-group"><label for="peso">Peso (kg):</label><input type="number" step="any" id="peso"></div>
+                        <div class="form-group"><label for="altura">Altura (cm):</label><input type="number" step="any" id="altura"></div>
+                        <div class="form-group"><label for="imc">IMC (kg/m²):</label><input type="number" step="any" id="imc" readonly></div>
+                        <div class="form-group"><label for="hospital-origen">Hospital de Origen:</label><select id="hospital-origen"><option value="" disabled selected>Seleccione...</option><option value="HUSE">HUSE</option><option value="Menorca">Menorca</option><option value="Ibiza">Ibiza</option><option value="Centro externo (fuera)">Centro externo (fuera)</option><option value="Centro externo (nosotros)">Centro externo (nosotros)</option></select></div>
+                        <div class="form-group"><label for="hospital-receptor">Hospital Receptor:</label><select id="hospital-receptor"><option value="" disabled selected>Seleccione...</option><option value="HUSE">HUSE</option><option value="Centro externo">Centro externo</option></select></div>
+                    </div>
+                </div>
+
+                <button type="button" class="accordion-button">Antecedentes y Causa Exitus</button>
+                <div class="accordion-panel">
+                    <div class="form-section">
+                        <h3>Antecedentes Patológicos</h3>
+                        <div class="checkbox-grid">
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-enol"><label for="ap-enol">ENOL</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-drogas"><label for="ap-drogas">DROGAS</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-hta"><label for="ap-hta">HTA</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-dm"><label for="ap-dm">DM</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-arterio"><label for="ap-arterio">ARTERIO</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-hepatitis"><label for="ap-hepatitis">HEPATITIS</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-neumo"><label for="ap-neumo">NEUMO</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-cardio"><label for="ap-cardio">CARDIO</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-renal"><label for="ap-renal">RENAL</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-infecciosa"><label for="ap-infecciosa">INFECCIOSA</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-nrl"><label for="ap-nrl">NRL</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-iqs"><label for="ap-iqs">IQs</label></div>
+                        </div>
+                        <div class="form-group hidden" id="ap-iqs-detalle-container"><label for="ap-iqs-detalle">Detalle Intervenciones Quirúrgicas:</label><textarea id="ap-iqs-detalle" rows="3"></textarea></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Causa Exitus</h3>
+                        <div class="form-group"><label for="causa-exitus">Causa:</label><select id="causa-exitus"><option value="" disabled selected>Seleccione...</option><option value="TCE">TCE</option><option value="ACV">ACV</option><option value="ANOXIA">ANOXIA</option><option value="ASISTOLIA">ASISTOLIA</option></select></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Fechas Clave</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="fecha-ingreso">Fecha Ingreso:</label><input type="date" id="fecha-ingreso"></div>
+                            <div class="form-group"><label for="hora-ingreso">Hora Ingreso:</label><input type="time" id="hora-ingreso"></div>
+                            <div class="form-group"><label for="fecha-ingreso-uci">Fecha Ingreso UCI:</label><input type="date" id="fecha-ingreso-uci"></div>
+                            <div class="form-group"><label for="dias-uci">Días en UCI:</label><input type="number" step="any" id="dias-uci" readonly></div>
+                            <div class="form-group"><label for="fecha-exitus">Fecha Exitus:</label><input type="date" id="fecha-exitus"></div>
+                            <div class="form-group"><label for="hora-exitus">Hora Exitus:</label><input type="time" id="hora-exitus"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="accordion-button">Situación Preoperatoria</button>
+                <div class="accordion-panel">
+                    <div class="form-section">
+                        <h3>Hemodinámica</h3>
+                        <div class="checkbox-group-inline"><input type="checkbox" id="hemo-hipotension"><label for="hemo-hipotension">Hipotensión</label><input type="number" step="any" id="hemo-hipotension-duracion" placeholder="Duración (min)" class="hidden"></div>
+                        <div class="checkbox-group-inline"><input type="checkbox" id="hemo-paro"><label for="hemo-paro">Paro</label><input type="number" step="any" id="hemo-paro-duracion" placeholder="Duración (min)" class="hidden"></div>
+                        <div class="checkbox-group-inline"><input type="checkbox" id="hemo-fiebre"><label for="hemo-fiebre">Fiebre</label><input type="number" step="0.1" id="hemo-fiebre-temp" placeholder="Tª máx (°C)" class="hidden"></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Serologías</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="sero-hbsag">HBs Ag:</label><select id="sero-hbsag"><option value="" disabled selected>Seleccione...</option><option>Positivo</option><option>Negativo</option><option>No realizado</option></select></div>
+                            <div class="form-group"><label for="sero-vhc">VHC:</label><select id="sero-vhc"><option value="" disabled selected>Seleccione...</option><option>Positivo</option><option>Negativo</option><option>No realizado</option></select></div>
+                            <div class="form-group"><label for="sero-vih">VIH:</label><select id="sero-vih"><option value="" disabled selected>Seleccione...</option><option>Positivo</option><option>Negativo</option><option>No realizado</option></select></div>
+                            <div class="form-group"><label for="sero-cmv">CMV IgG:</label><select id="sero-cmv"><option value="" disabled selected>Seleccione...</option><option>Positivo</option><option>Negativo</option><option>No realizado</option></select></div>
+                            <div class="form-group"><label for="sero-toxo">Toxo IgG:</label><select id="sero-toxo"><option value="" disabled selected>Seleccione...</option><option>Positivo</option><option>Negativo</option><option>No realizado</option></select></div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Gasometría</h3>
+                        <div class="form-grid-dynamic">
+                            <div class="form-group"><label for="gaso-ph">pH:</label><input type="number" step="any" id="gaso-ph"></div>
+                            <div class="form-group"><label for="gaso-eb">EB:</label><input type="number" step="any" id="gaso-eb"></div>
+                            <div class="form-group"><label for="gaso-po2">pO2 (mmHg):</label><input type="number" step="any" id="gaso-po2"></div>
+                            <div class="form-group"><label for="gaso-sato2">satO2 (%):</label><input type="number" step="any" id="gaso-sato2"></div>
+                            <div class="form-group"><label for="gaso-pco2">pCO2 (mmHg):</label><input type="number" step="any" id="gaso-pco2"></div>
+                            <div class="form-group"><label for="gaso-lactato">Lactato (mmol/L):</label><input type="number" step="any" id="gaso-lactato"></div>
+                            <div class="form-group"><label for="gaso-hco3">HCO3 (mEq/L):</label><input type="number" step="any" id="gaso-hco3"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="accordion-button">Laboratorio</button>
+                <div class="accordion-panel">
+                     <div class="form-grid-dynamic" style="--cols: 4;">
+                        <div class="form-group"><label for="lab-glu">glu (mg/dL):</label><input type="number" step="any" id="lab-glu"></div>
+                        <div class="form-group"><label for="lab-urea">urea (mg/dL):</label><input type="number" step="any" id="lab-urea"></div>
+                        <div class="form-group"><label for="lab-creat">creat (mg/dL):</label><input type="number" step="any" id="lab-creat"></div>
+                        <div class="form-group"><label for="lab-na">Na+ (mEq/L):</label><input type="number" step="any" id="lab-na"></div>
+                        <div class="form-group"><label for="lab-k">K+ (mEq/L):</label><input type="number" step="any" id="lab-k"></div>
+                        <div class="form-group"><label for="lab-cl">Cl- (mEq/L):</label><input type="number" step="any" id="lab-cl"></div>
+                        <div class="form-group"><label for="lab-bilt">bil T (mg/dL):</label><input type="number" step="any" id="lab-bilt"></div>
+                        <div class="form-group"><label for="lab-bild">bil D (mg/dL):</label><input type="number" step="any" id="lab-bild"></div>
+                        <div class="form-group"><label for="lab-got">GOT (U/L):</label><input type="number" step="any" id="lab-got"></div>
+                        <div class="form-group"><label for="lab-gpt">GPT (U/L):</label><input type="number" step="any" id="lab-gpt"></div>
+                        <div class="form-group"><label for="lab-fa">FA (U/L):</label><input type="number" step="any" id="lab-fa"></div>
+                        <div class="form-group"><label for="lab-ggt">GGT (U/L):</label><input type="number" step="any" id="lab-ggt"></div>
+                        <div class="form-group"><label for="lab-prot">prot (g/dL):</label><input type="number" step="any" id="lab-prot"></div>
+                        <div class="form-group"><label for="lab-alb">alb (g/dL):</label><input type="number" step="any" id="lab-alb"></div>
+                        <div class="form-group"><label for="lab-hb">Hb (g/dL):</label><input type="number" step="any" id="lab-hb"></div>
+                        <div class="form-group"><label for="lab-hto">Hto (%):</label><input type="number" step="any" id="lab-hto"></div>
+                        <div class="form-group"><label for="lab-leuc">leuc (K/uL):</label><input type="number" step="any" id="lab-leuc"></div>
+                        <div class="form-group"><label for="lab-desv">desv (%):</label><input type="number" step="any" id="lab-desv"></div>
+                        <div class="form-group"><label for="lab-plaq">plaq (K/uL):</label><input type="number" step="any" id="lab-plaq"></div>
+                        <div class="form-group"><label for="lab-tp">tquick (%):</label><input type="number" step="any" id="lab-tp"></div>
+                        <div class="form-group"><label for="lab-inr">INR:</label><input type="number" step="any" id="lab-inr"></div>
+                        <div class="form-group"><label for="lab-fibr">fibr (mg/dL):</label><input type="number" step="any" id="lab-fibr"></div>
+                     </div>
+                </div>
+
+                <button type="button" class="accordion-button">Medicación y Ecografía</button>
+                <div class="accordion-panel">
+                    <div class="form-section">
+                        <h3>Medicación Vasoactiva y Soporte</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="med-htes">Conc. de Hematíes (unidades):</label><input type="text" id="med-htes"></div>
+                            <div class="form-group"><label for="med-plasma">Plasma (unidades):</label><input type="text" id="med-plasma"></div>
+                            <div class="form-group"><label for="med-dopamina">Dopamina (dosis):</label><input type="text" id="med-dopamina"></div>
+                            <div class="form-group"><label for="med-dobutamina">Dobutamina (dosis):</label><input type="text" id="med-dobutamina"></div>
+                            <div class="form-group"><label for="med-noradrenalina">Noradrenalina (dosis):</label><input type="text" id="med-noradrenalina"></div>
+                            <div class="form-group"><label for="med-furosemida">Furosemida (dosis):</label><input type="text" id="med-furosemida"></div>
+                            <div class="form-group"><label for="med-corticoides">Corticoides (dosis):</label><input type="text" id="med-corticoides"></div>
+                        </div>
+                        <div class="form-group"><label for="med-otros">Otros y Dosis:</label><textarea id="med-otros" rows="3"></textarea></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Ecografía</h3>
+                        <div class="form-group"><label for="eco-resultado">Resultado:</label><select id="eco-resultado"><option value="" disabled selected>Seleccione...</option><option value="Normal">Normal</option><option value="Esteatosis Leve">Esteatosis Leve</option><option value="Esteatosis Moderada">Esteatosis Moderada</option><option value="Esteatosis Severa">Esteatosis Severa</option><option value="Esteatosis Parcheada">Esteatosis Parcheada</option></select></div>
+                    </div>
+                </div>
+
+                <button type="button" class="accordion-button">Datos de Intervención Quirúrgica</button>
+                <div class="accordion-panel">
+                    <div class="form-section">
+                        <h3>Órganos Extraídos</h3>
+                        <div class="checkbox-grid">
+                            <div class="form-group checkbox"><input type="checkbox" id="org-higado" checked><label for="org-higado">Hígado</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="org-rinones"><label for="org-rinones">Riñones</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="org-corazon"><label for="org-corazon">Corazón</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="org-pancreas"><label for="org-pancreas">Páncreas</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="org-pulmones"><label for="org-pulmones">Pulmones</label></div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Equipo Quirúrgico</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="eq-cirujano">Cirujano:</label><input type="text" id="eq-cirujano"></div>
+                            <div class="form-group"><label for="eq-ayudante1">Ayudante 1:</label><input type="text" id="eq-ayudante1"></div>
+                            <div class="form-group"><label for="eq-ayudante2">Ayudante 2:</label><input type="text" id="eq-ayudante2"></div>
+                            <div class="form-group"><label for="eq-residente">Residente:</label><input type="text" id="eq-residente"></div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Canulación y Preservación</h3>
+                        <div class="form-grid">
+                             <div class="form-group"><label for="can-aorta">Canulación Aórtica:</label><select id="can-aorta"><option value="" disabled selected>Seleccione...</option><option value="Aorta">Aorta</option><option value="Ilíaca">Ilíaca</option></select></div>
+                             <div class="form-group"><label for="can-porta">Canulación Portal:</label><select id="can-porta"><option value="" disabled selected>Seleccione...</option><option value="VMI">VMI</option><option value="Porta">Porta</option><option value="VMS">VMS</option><option value="Esplénica">Esplénica</option></select></div>
+                        </div>
+                        <div class="form-grid-dynamic" style="--cols: 3;">
+                            <div class="form-group"><label for="sol-preservacion">Solución de Preservación:</label><select id="sol-preservacion"><option value="" disabled selected>Seleccione...</option><option value="Custodiol">Custodiol</option><option value="IGL-1">IGL-1</option></select></div>
+                            <div class="form-group"><label for="sol-aorta">Volumen infundido Aorta (cc):</label><input type="number" step="any" id="sol-aorta"></div>
+                            <div class="form-group"><label for="sol-porta">Volumen infundido Porta (cc):</label><input type="number" step="any" id="sol-porta"></div>
+                        </div>
+                    </div>
+                     <div class="form-section">
+                        <h3>Anatomía</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="anat-arterializacion">Arterialización:</label><select id="anat-arterializacion"><option value="" disabled selected>Seleccione...</option><option>Normal</option><option>Variante Derecha</option><option>Variante Izquierda</option><option>Variante Derecha e Izquierda</option><option>Todo de AMS</option></select></div>
+                            <div class="form-group"><label for="anat-biliar">Vía Biliar:</label><select id="anat-biliar"><option value="" disabled selected>Seleccione...</option><option>Única</option><option>Cístico Paralelo</option><option>Colecistectomía</option><option>Dilatación</option></select></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="accordion-button">Características del Hígado</button>
+                <div class="accordion-panel">
+                    <div class="form-section">
+                        <h3>Características Macroscópicas</h3>
+                        <div class="form-grid-dynamic" style="--cols: 3;">
+                           <div class="form-group"><label for="hig-aspecto">Aspecto:</label><select id="hig-aspecto"><option value="" disabled selected>Seleccione...</option><option>Normal</option><option>Nodular</option><option>Fibrosis local</option><option>Fibrosis difusa</option></select></div>
+                           <div class="form-group"><label for="hig-coloracion">Coloración:</label><select id="hig-coloracion"><option value="" disabled selected>Seleccione...</option><option>Normal</option><option>Congestivo</option><option>Pálido</option></select></div>
+                           <div class="form-group"><label for="hig-bordes">Bordes:</label><select id="hig-bordes"><option value="" disabled selected>Seleccione...</option><option>Normales</option><option>Romos</option></select></div>
+                           <div class="form-group"><label for="hig-areas">Áreas:</label><select id="hig-areas"><option value="" disabled selected>Seleccione...</option><option>Normal</option><option>Isquemia focal</option><option>Piqueteado</option></select></div>
+                           <div class="form-group"><label for="hig-consistencia">Consistencia:</label><select id="hig-consistencia"><option value="" disabled selected>Seleccione...</option><option>Normal</option><option>Dura</option></select></div>
+                           <div class="form-group"><label for="hig-esteatosis">Esteatosis:</label><select id="hig-esteatosis"><option value="" disabled selected>Seleccione...</option><option>No aparente</option><option>Leve</option><option>Moderada</option><option>Severa</option></select></div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Valoración Global Aspecto Macroscópico</h3>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="val-antes">Antes de la perfusión:</label><select id="val-antes"><option value="" disabled selected>Seleccione...</option><option>Bueno</option><option>Regular</option><option>Malo</option></select></div>
+                            <div class="form-group"><label for="val-despues">Después de la perfusión:</label><select id="val-despues"><option value="" disabled selected>Seleccione...</option><option>Bueno</option><option>Regular</option><option>Malo</option></select></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="accordion-button">Perfusión, Banco y Tiempos</button>
+                <div class="accordion-panel">
+                    <div class="form-section">
+                        <h3>Perfusión</h3>
+                        <div class="form-group"><label for="perfusion-resultado">Resultado:</label><select id="perfusion-resultado"><option value="" disabled selected>Seleccione...</option><option>Homogénea</option><option>Heterogénea</option></select></div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Banco</h3>
+                        <div class="checkbox-grid">
+                            <div class="form-group checkbox"><input type="checkbox" id="banco-diseccion"><label for="banco-diseccion">disección pedículos vasculares</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="banco-reanastomosis"><label for="banco-reanastomosis">reanastomosis secciones accidentales</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="banco-anastomosis-ahd"><label for="banco-anastomosis-ahd">anastomosis AHD a muñón esplénica</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="banco-control-cava"><label for="banco-control-cava">control orificios Cava</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="banco-sutura-porta"><label for="banco-sutura-porta">sutura lesión accidental Porta</label></div>
+                            <div class="form-group checkbox"><input type="checkbox" id="banco-reparacion-decaps"><label for="banco-reparacion-decaps">reparación decapsulaciones</label></div>
+                        </div>
+                        <div class="checkbox-group-inline">
+                            <input type="checkbox" id="banco-lesiones"><label for="banco-lesiones">lesiones</label>
+                        </div>
+                        <div class="form-group hidden" id="lesiones-detalle-container">
+                            <label for="lesiones-detalle">Detalle de Lesiones:</label>
+                            <textarea id="lesiones-detalle" rows="4"></textarea>
+                        </div>
+                         <div class="form-group">
+                            <label for="incidencias">Incidencias:</label>
+                            <textarea id="incidencias" rows="4"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Tiempos - Donante Muerte Encefálica</h3>
+                        <div class="form-grid-dynamic" style="--cols: 3;">
+                            <div class="form-group"><label for="t-me-inicio-int">Hora inicio intervención:</label><input type="time" id="t-me-inicio-int"></div>
+                            <div class="form-group"><label for="t-me-inicio-perf">Hora inicio perfusión:</label><input type="time" id="t-me-inicio-perf"></div>
+                            <div class="form-group"><label for="t-me-fin-perf">Hora fin perfusión:</label><input type="time" id="t-me-fin-perf"></div>
+                            <div class="form-group"><label for="t-me-extraccion">Hora extracción órgano:</label><input type="time" id="t-me-extraccion"></div>
+                            <div class="form-group"><label for="t-me-nevera">Hora órgano en nevera:</label><input type="time" id="t-me-nevera"></div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <h3>Tiempos - Donante en Asistolia</h3>
+                         <div class="form-grid-dynamic" style="--cols: 3;">
+                            <div class="form-group"><label for="t-as-inicio-lim">Hora inicio limitación:</label><input type="time" id="t-as-inicio-lim"></div>
+                            <div class="form-group"><label for="t-as-pas">Hora P.art sistólica < 60:</label><input type="time" id="t-as-pas"></div>
+                            <div class="form-group"><label for="t-as-pcr">Hora de PCR:</label><input type="time" id="t-as-pcr"></div>
+                            <div class="form-group"><label for="t-as-exitus">Hora de exitus:</label><input type="time" id="t-as-exitus"></div>
+                            <div class="form-group"><label for="t-as-perf-normo">Hora perfusión normotérmica:</label><input type="time"id="t-as-perf-normo"></div>
+                            <div class="form-group"><label for="t-as-inicio-ext">Hora inicio extracción:</label><input type="time" id="t-as-inicio-ext"></div>
+                            <div class="form-group"><label for="t-as-inicio-perf-fria">Hora inicio perfusión fría:</label><input type="time" id="t-as-inicio-perf-fria"></div>
+                            <div class="form-group"><label for="t-as-fin-perf-fria">Hora fin perfusión fría:</label><input type="time" id="t-as-fin-perf-fria"></div>
+                            <div class="form-group"><label for="t-as-extraccion">Hora extracción órgano:</label><input type="time" id="t-as-extraccion"></div>
+                            <div class="form-group"><label for="t-as-nevera">Hora órgano en nevera:</label><input type="time" id="t-as-nevera"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button type="button" id="save-record-button">Guardar Registro</button>
+                    <button type="button" id="generate-pdf-button">Generar PDF</button>
+                    <button type="button" id="reset-button">Limpiar para Nuevo Registro</button>
+                </div>
+
+            </form>
+        </main>
+        
+        <footer>
+            <p>Aplicación de uso interno para la unidad de trasplante. Los datos se guardan de forma segura en la nube.</p>
+        </footer>
+    </div>
+    
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, onSnapshot, collection, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURATION ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // --- APP STATE ---
+        let db, auth, userId;
+        let currentRecordId = null;
+        let recordsUnsubscribe = null;
+        const form = document.getElementById('donante-form');
+        const allFormElements = form.querySelectorAll('input, select, textarea');
+
+        // --- FIREBASE INITIALIZATION ---
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await setPersistence(auth, browserLocalPersistence);
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("User authenticated with UID:", userId);
+                        listenToRecords();
+                    } else {
+                        await authenticateUser();
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showStatus("Error: No se pudo conectar a la base de datos.", 'error');
+            }
+        }
+        
+        async function authenticateUser() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                showStatus("Error de autenticación.", 'error');
+            }
+        }
+
+        // --- UI & STATUS ---
+        function showStatus(message, type = 'info', duration = 4000) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = type; // 'success', 'error', 'info'
+            if (duration > 0) {
+                setTimeout(() => { statusEl.style.display = 'none'; }, duration);
+            }
+        }
+
+        // --- DATA HANDLING ---
+        function listenToRecords() {
+            if (recordsUnsubscribe) recordsUnsubscribe();
+            if (!userId) return;
+
+            const recordsCol = collection(db, `artifacts/${appId}/users/${userId}/donors`);
+            const q = query(recordsCol);
+
+            recordsUnsubscribe = onSnapshot(q, (querySnapshot) => {
+                const selector = document.getElementById('record-selector');
+                const currentSelection = selector.value;
+                selector.innerHTML = '<option value="">-- Nuevo Registro --</option>';
+                const records = [];
+                querySnapshot.forEach((doc) => {
+                    records.push({ id: doc.id, data: doc.data() });
+                });
+                
+                records.sort((a, b) => (b.data.createdAt?.toMillis() || 0) - (a.data.createdAt?.toMillis() || 0));
+
+                records.forEach(record => {
+                    const option = document.createElement('option');
+                    option.value = record.id;
+                    const nhc = record.data.nhc || 'Sin NHC';
+                    const date = record.data.createdAt?.toDate ? record.data.createdAt.toDate().toLocaleDateString('es-ES') : 'Sin fecha';
+                    option.textContent = `${date} - NHC: ${nhc}`;
+                    selector.appendChild(option);
+                });
+                
+                if (Array.from(selector.options).some(opt => opt.value === currentSelection)) {
+                    selector.value = currentSelection;
+                }
+            }, (error) => {
+                console.error("Error listening to records:", error);
+                showStatus("Error al cargar la lista de registros.", 'error');
+            });
+        }
+
+        function getFormData() {
+            const data = {};
+            allFormElements.forEach(el => {
+                if (el.id) {
+                    if (el.type === 'checkbox') {
+                        data[el.id] = el.checked;
+                    } else {
+                        data[el.id] = el.value;
+                    }
+                }
+            });
+            return data;
+        }
+
+        function populateForm(data) {
+            resetForm(); // Start with a clean slate
+            allFormElements.forEach(el => {
+                if (el.id && data[el.id] !== undefined) {
+                    if (el.type === 'checkbox') {
+                        el.checked = data[el.id];
+                        // Trigger change event to show/hide conditional fields
+                        el.dispatchEvent(new Event('change'));
+                    } else {
+                        el.value = data[el.id];
+                    }
+                }
+            });
+            // Recalculate computed fields
+            document.getElementById('peso').dispatchEvent(new Event('input'));
+            document.getElementById('fecha-nacimiento').dispatchEvent(new Event('change'));
+            document.getElementById('fecha-ingreso-uci').dispatchEvent(new Event('change'));
+        }
+
+        async function handleLoadRecord() {
+            const selector = document.getElementById('record-selector');
+            const docId = selector.value;
+            currentRecordId = docId;
+
+            if (!docId) {
+                resetForm();
+                return;
+            }
+            
+            try {
+                showStatus("Cargando registro...", 'info', 0);
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/donors`, docId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    populateForm(docSnap.data());
+                    showStatus(`Registro ${docSnap.data().nhc || ''} cargado.`, 'success');
+                } else {
+                    showStatus("El registro seleccionado ya no existe.", 'error');
+                    resetForm();
+                }
+            } catch (error) {
+                console.error("Error loading record: ", error);
+                showStatus("Error al cargar el registro.", 'error');
+            }
+        }
+
+        async function handleSaveRecord() {
+            const nhcInput = document.getElementById('nhc');
+            if (!nhcInput.value) {
+                showStatus("El campo 'NHC' es obligatorio para guardar.", 'error');
+                nhcInput.focus();
+                return;
+            }
+
+            const data = getFormData();
+            
+            try {
+                if (currentRecordId) {
+                    // Update
+                    const docRef = doc(db, `artifacts/${appId}/users/${userId}/donors`, currentRecordId);
+                    await setDoc(docRef, { ...data, updatedAt: serverTimestamp() }, { merge: true });
+                    showStatus(`Registro ${data.nhc} actualizado correctamente.`, 'success');
+                } else {
+                    // Create
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/users/${userId}/donors`), {
+                        ...data,
+                        createdAt: serverTimestamp()
+                    });
+                    currentRecordId = docRef.id;
+                    document.getElementById('record-selector').value = currentRecordId;
+                    showStatus(`Nuevo registro ${data.nhc} guardado con éxito.`, 'success');
+                }
+            } catch (error) {
+                console.error("Error saving record: ", error);
+                showStatus("Error al guardar los datos.", 'error');
+            }
+        }
+
+        // --- LÓGICA ORIGINAL DEL USUARIO (ADAPTADA) ---
+        window.jsPDF = window.jspdf.jsPDF;
+
+        function formateaFecha(fechaIso) {
+            if (!fechaIso) return "";
+            const [year, month, day] = fechaIso.split("-");
+            return `${day}/${month}/${year}`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeFirebase(); // Iniciar Firebase
+
+            // Lógica del Acordeón
+            const accordions = document.getElementsByClassName("accordion-button");
+            for (let i = 0; i < accordions.length; i++) {
+                accordions[i].addEventListener("click", function() {
+                    this.classList.toggle("active");
+                    const panel = this.nextElementSibling;
+                    if (panel.style.maxHeight) {
+                        panel.style.maxHeight = null;
+                    } else {
+                        panel.style.maxHeight = panel.scrollHeight + "px";
+                    }
+                });
+            }
+
+            // --- CÁLCULOS AUTOMÁTICOS ---
+            const pesoInput = document.getElementById('peso');
+            const alturaInput = document.getElementById('altura');
+            const imcInput = document.getElementById('imc');
+            const fechaNacimientoInput = document.getElementById('fecha-nacimiento');
+            const fechaExtraccionInput = document.getElementById('fecha');
+            const edadInput = document.getElementById('edad');
+            const fechaIngresoUCIInput = document.getElementById('fecha-ingreso-uci');
+            const diasUCIInput = document.getElementById('dias-uci');
+
+            function calcularIMC() {
+                const peso = parseFloat(pesoInput.value);
+                const altura = parseFloat(alturaInput.value);
+                if (peso > 0 && altura > 0) {
+                    imcInput.value = (peso / ((altura / 100) ** 2)).toFixed(2);
+                } else {
+                    imcInput.value = '';
+                }
+            }
+            pesoInput.addEventListener('input', calcularIMC);
+            alturaInput.addEventListener('input', calcularIMC);
+
+            function calcularEdad() {
+                if (fechaNacimientoInput.value && fechaExtraccionInput.value) {
+                    let edad = new Date(fechaExtraccionInput.value).getFullYear() - new Date(fechaNacimientoInput.value).getFullYear();
+                    const m = new Date(fechaExtraccionInput.value).getMonth() - new Date(fechaNacimientoInput.value).getMonth();
+                    if (m < 0 || (m === 0 && new Date(fechaExtraccionInput.value).getDate() < new Date(fechaNacimientoInput.value).getDate())) {
+                        edad--;
+                    }
+                    edadInput.value = edad;
+                } else {
+                    edadInput.value = '';
+                }
+            }
+            fechaNacimientoInput.addEventListener('change', calcularEdad);
+            fechaExtraccionInput.addEventListener('change', calcularEdad);
+
+            function calcularDiasUCI() {
+                if (fechaIngresoUCIInput.value && fechaExtraccionInput.value) {
+                    const diffTiempo = new Date(fechaExtraccionInput.value) - new Date(fechaIngresoUCIInput.value);
+                    diasUCIInput.value = diffTiempo >= 0 ? Math.ceil(diffTiempo / (1000 * 3600 * 24)) : 0;
+                } else {
+                    diasUCIInput.value = '';
+                }
+            }
+            fechaIngresoUCIInput.addEventListener('change', calcularDiasUCI);
+            fechaExtraccionInput.addEventListener('change', calcularDiasUCI);
+
+            // Lógica para mostrar/ocultar detalles
+            const setupConditionalDisplay = (checkboxId, containerId) => {
+                const checkbox = document.getElementById(checkboxId);
+                const container = document.getElementById(containerId);
+                if(checkbox && container){
+                    checkbox.addEventListener('change', () => {
+                        container.classList.toggle('hidden', !checkbox.checked);
+                    });
+                }
+            };
+            setupConditionalDisplay('ap-iqs', 'ap-iqs-detalle-container');
+            setupConditionalDisplay('banco-lesiones', 'lesiones-detalle-container');
+            
+            ['hemo-hipotension', 'hemo-paro', 'hemo-fiebre'].forEach(id => {
+                const checkbox = document.getElementById(id);
+                const inputId = id + (id === 'hemo-fiebre' ? '-temp' : '-duracion');
+                const input = document.getElementById(inputId);
+                if(checkbox && input){
+                    checkbox.addEventListener('change', () => {
+                        input.classList.toggle('hidden', !checkbox.checked);
+                    });
+                }
+            });
+
+            // --- EVENT LISTENERS PARA BOTONES ---
+            document.getElementById('record-selector').addEventListener('change', handleLoadRecord);
+            document.getElementById('save-record-button').addEventListener('click', handleSaveRecord);
+            document.getElementById('generate-pdf-button').addEventListener('click', generatePDF);
+            document.getElementById('reset-button').addEventListener('click', resetForm);
+        });
+
+        function resetForm() {
+            document.getElementById('donante-form').reset();
+            // Resetear estado de la app
+            currentRecordId = null;
+            document.getElementById('record-selector').value = "";
+            // Ocultar campos condicionales
+            document.querySelectorAll('.hidden').forEach(el => {
+                if(el.id.includes('-container') || el.id.includes('-duracion') || el.id.includes('-temp')){
+                    el.classList.add('hidden');
+                }
+            });
+            // Limpiar campos calculados
+            ['imc', 'dias-uci', 'edad'].forEach(id => document.getElementById(id).value = '');
+            showStatus("Formulario limpio, listo para un nuevo registro.", 'info');
+        }
+
+        // --- LÓGICA DE GENERACIÓN DE PDF CON JSPDF (SIN CAMBIOS) ---
+        function generatePDF() {
+            // ... (El código de generación de PDF del usuario se pega aquí sin cambios)
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            
+            let y = 15;
+            const x = 15;
+            const x2 = 110;
+            const pageHeight = 280;
+            const lineHeight = 6;
+            const titleHeight = 8;
+            const sectionSpacing = 6;
+            const textColor = '#000000';
+
+            const checkY = (spaceNeeded = lineHeight * 2) => {
+                if (y + spaceNeeded > pageHeight) {
+                    doc.addPage();
+                    y = 15;
+                }
+            };
+            
+            const addTitle = (title) => {
+                checkY(titleHeight + sectionSpacing);
+                y += sectionSpacing;
+                doc.setFontSize(12).setFont(undefined, 'bold').setTextColor(textColor).text(title, x, y);
+                doc.line(x, y + 1.5, 195, y + 1.5);
+                y += titleHeight;
+            };
+
+            const addSubTitle = (title) => {
+                checkY(titleHeight);
+                y += 4;
+                doc.setFontSize(11).setFont(undefined, 'bold').setTextColor(textColor).text(title, x, y);
+                y += lineHeight;
+            };
+
+            const addLine = (label, value, xPos = x, currentY = y) => {
+                doc.setFontSize(10).setFont(undefined, 'bold').text(label, xPos, currentY);
+                doc.setFont(undefined, 'normal').text(String(value || '-'), xPos + 40, currentY);
+                return currentY + lineHeight;
+            };
+            
+            const addMultiLine = (label, value) => {
+                checkY();
+                const fullText = `${label} ${String(value || '-')}`;
+                const splitText = doc.setFontSize(10).splitTextToSize(fullText, 180);
+                checkY(splitText.length * 5);
+                doc.text(splitText, x, y);
+                y += (splitText.length * 5) + 2;
+            };
+
+            const getValue = (id) => document.getElementById(id).value;
+            const getCheckbox = (id) => document.getElementById(id).checked;
+            const getCheckboxList = (selector, excludeId = null) => {
+                return Array.from(document.querySelectorAll(selector))
+                    .filter(cb => cb.checked && cb.id !== excludeId)
+                    .map(cb => cb.nextElementSibling.textContent.trim())
+                    .join(', ') || '';
+            };
+
+            // --- CONSTRUCCIÓN DEL PDF ---
+
+            doc.setFontSize(14).setFont(undefined, 'bold').setTextColor(textColor).text("Unidad de Cirugía Hepatobiliar y Trasplante Hepático", 105, y, { align: 'center' });
+            y += 6;
+            doc.setFontSize(12).setFont(undefined, 'normal').setTextColor(textColor).text("Hospital Universitario Son Espases", 105, y, { align: 'center' });
+            y += 10;
+            doc.setFontSize(18).setFont(undefined, 'bold').setTextColor(textColor).text("EXTRACCIÓN HEPÁTICA", 105, y, { align: 'center' });
+            y += 8;
+            doc.setFontSize(14).setFont(undefined, 'normal').setTextColor(textColor).text("Registro de Datos del Donante", 105, y, { align: 'center' });
+            y += 12;
+
+            addTitle("Datos Generales del Donante");
+            let y1 = y; let y2 = y;
+            y1 = addLine("NHC:", getValue('nhc'), x, y1);
+            y1 = addLine("Fecha Nacimiento:", formateaFecha(getValue('fecha-nacimiento')), x, y1);
+            y1 = addLine("Edad:", getValue('edad') + ' años', x, y1);
+            y1 = addLine("Peso:", getValue('peso') + ' kg', x, y1);
+            y1 = addLine("IMC:", getValue('imc') + ' kg/m²', x, y1);
+            y1 = addLine("H. Origen:", getValue('hospital-origen'), x, y1);
+
+            y2 = addLine("Fecha/Hora Ext.:", `${formateaFecha(getValue('fecha'))} ${getValue('hora')}`, x2, y2);
+            y2 = addLine("Sexo:", getValue('sexo'), x2, y2);
+            y2 = addLine("Altura:", getValue('altura') + ' cm', x2, y2);
+            y2 = addLine("Grupo/RH:", `${getValue('grupo-sanguineo')} ${getValue('rh')}`, x2, y2);
+            y2 = addLine("H. Receptor:", getValue('hospital-receptor'), x2, y2);
+            y = Math.max(y1, y2);
+
+            addTitle("Antecedentes y Fechas Clave");
+            let detalleIQs = getCheckbox('ap-iqs') ? `\n- Detalle IQs: ${getValue('ap-iqs-detalle')}` : '';
+            const antecedentes = getCheckboxList('[id^="ap-"]') + detalleIQs;
+            doc.setFontSize(10).setFont(undefined, 'bold').text("Antecedentes:", x, y);
+            const splitAntecedentes = doc.splitTextToSize(antecedentes || 'Ninguno', 80);
+            doc.setFont(undefined, 'normal').text(splitAntecedentes, x, y + 5);
+            y1 = y + (splitAntecedentes.length * 5) + 5;
+
+            y2 = y;
+            y2 = addLine("Causa Exitus:", getValue('causa-exitus'), x2, y2);
+            y2 = addLine("Ingreso:", `${formateaFecha(getValue('fecha-ingreso'))} ${getValue('hora-ingreso')}`, x2, y2);
+            y2 = addLine("Ingreso UCI:", formateaFecha(getValue('fecha-ingreso-uci')), x2, y2);
+            y2 = addLine("Días en UCI:", getValue('dias-uci'), x2, y2);
+            y2 = addLine("Exitus:", `${formateaFecha(getValue('fecha-exitus'))} ${getValue('hora-exitus')}`, x2, y2);
+            y = Math.max(y1, y2);
+
+            addTitle("Situación Preoperatoria");
+            y1 = y;
+            y1 = addLine("Hipotensión:", `${getCheckbox('hemo-hipotension') ? 'Sí' : 'No'} (${getValue('hemo-hipotension-duracion')} min)`, x, y1);
+            y1 = addLine("Paro:", `${getCheckbox('hemo-paro') ? 'Sí' : 'No'} (${getValue('hemo-paro-duracion')} min)`, x, y1);
+            y1 = addLine("Fiebre:", `${getCheckbox('hemo-fiebre') ? 'Sí' : 'No'} (Tª: ${getValue('hemo-fiebre-temp')}°C)`, x, y1);
+            
+            y2 = y;
+            y2 = addLine("HBs Ag:", getValue('sero-hbsag'), x2, y2);
+            y2 = addLine("VHC:", getValue('sero-vhc'), x2, y2);
+            y2 = addLine("VIH:", getValue('sero-vih'), x2, y2);
+            y2 = addLine("CMV IgG:", getValue('sero-cmv'), x2, y2);
+            y2 = addLine("Toxo IgG:", getValue('sero-toxo'), x2, y2);
+            y = Math.max(y1, y2);
+            
+            addSubTitle("Gasometría");
+            const gasoData = [['pH:', getValue('gaso-ph')], ['EB:', getValue('gaso-eb')], ['pO2:', getValue('gaso-po2')], ['satO2:', getValue('gaso-sato2')], ['pCO2:', getValue('gaso-pco2')], ['Lactato:', getValue('gaso-lactato')], ['HCO3:', getValue('gaso-hco3')]];
+            doc.setFontSize(10);
+            gasoData.forEach((item, index) => {
+                const xPos = x + (index % 4) * 48;
+                if (index > 0 && index % 4 === 0) y += lineHeight;
+                doc.setFont(undefined, 'bold').text(item[0], xPos, y);
+                doc.setFont(undefined, 'normal').text(item[1] || '-', xPos + 20, y);
+            });
+            y += lineHeight;
+
+            addTitle("Laboratorio");
+            const labData = [['glu:', getValue('lab-glu')],['urea:', getValue('lab-urea')],['creat:', getValue('lab-creat')],['Na+:', getValue('lab-na')],['K+:', getValue('lab-k')],['Cl-:', getValue('lab-cl')],['bil T:', getValue('lab-bilt')],['bil D:', getValue('lab-bild')],['GOT:', getValue('lab-got')],['GPT:', getValue('lab-gpt')],['FA:', getValue('lab-fa')],['GGT:', getValue('lab-ggt')],['prot:', getValue('lab-prot')],['alb:', getValue('lab-alb')],['Hb:', getValue('lab-hb')],['Hto:', getValue('lab-hto')],['leuc:', getValue('lab-leuc')],['desv:', getValue('lab-desv')],['plaq:', getValue('lab-plaq')],['tquick:', getValue('lab-tp')],['INR:', getValue('lab-inr')],['fibr:', getValue('lab-fibr')]];
+            labData.forEach((item, index) => {
+                const xPos = x + (index % 4) * 48;
+                if (index > 0 && index % 4 === 0) y += lineHeight;
+                checkY();
+                doc.setFontSize(9).setFont(undefined, 'bold').text(item[0], xPos, y);
+                doc.setFontSize(10).setFont(undefined, 'normal').text(item[1] || '-', xPos + 15, y);
+            });
+            
+            doc.addPage();
+            y = 15;
+
+            addTitle("Medicación y Ecografía");
+            addSubTitle("Medicación");
+            y1 = y; y2 = y;
+            y1 = addLine("Conc. Hematíes:", getValue('med-htes'), x, y1);
+            y1 = addLine("Plasma:", getValue('med-plasma'), x, y1);
+            y1 = addLine("Dopamina:", getValue('med-dopamina'), x, y1);
+            y1 = addLine("Dobutamina:", getValue('med-dobutamina'), x, y1);
+            y2 = addLine("Noradrenalina:", getValue('med-noradrenalina'), x2, y2);
+            y2 = addLine("Furosemida:", getValue('med-furosemida'), x2, y2);
+            y2 = addLine("Corticoides:", getValue('med-corticoides'), x2, y2);
+            y = Math.max(y1, y2);
+            y = addLine("Otros:", getValue('med-otros'), x, y);
+            
+            y += sectionSpacing;
+            addSubTitle("Ecografía");
+            y = addLine("Resultado:", getValue('eco-resultado'), x, y);
+
+            addTitle("Datos de Intervención Quirúrgica");
+            y = addLine("Órganos Extraídos:", getCheckboxList('[id^="org-"]'));
+            y += sectionSpacing; 
+
+            addSubTitle("Equipo Quirúrgico");
+            y1 = y; y2 = y;
+            y1 = addLine("Cirujano:", getValue('eq-cirujano'), x, y1);
+            y1 = addLine("Ayudante 2:", getValue('eq-ayudante2'), x, y1);
+            y2 = addLine("Ayudante 1:", getValue('eq-ayudante1'), x2, y2);
+            y2 = addLine("Residente:", getValue('eq-residente'), x2, y2);
+            y = Math.max(y1, y2);
+
+            addSubTitle("Canulación y Preservación");
+            y1 = y; y2 = y;
+            y1 = addLine("Can. Aórtica:", getValue('can-aorta'), x, y1);
+            y1 = addLine("Can. Portal:", getValue('can-porta'), x, y1);
+            y1 = addLine("Sol. Preservación:", getValue('sol-preservacion'), x, y1);
+            y2 = addLine("Vol. Aorta (cc):", getValue('sol-aorta'), x2, y2);
+            y2 = addLine("Vol. Porta (cc):", getValue('sol-porta'), x2, y2);
+            y = Math.max(y1, y2);
+
+            addSubTitle("Anatomía");
+            y1 = y; y2 = y;
+            y1 = addLine("Arterialización:", getValue('anat-arterializacion'), x, y1);
+            y2 = addLine("Vía Biliar:", getValue('anat-biliar'), x2, y2);
+            y = Math.max(y1, y2);
+            
+            addTitle("Características del Hígado");
+            addSubTitle("Características Macroscópicas");
+            y1 = y; y2 = y;
+            y1 = addLine("Aspecto:", getValue('hig-aspecto'), x, y1);
+            y1 = addLine("Coloración:", getValue('hig-coloracion'), x, y1);
+            y1 = addLine("Bordes:", getValue('hig-bordes'), x, y1);
+            y2 = addLine("Áreas:", getValue('hig-areas'), x2, y2);
+            y2 = addLine("Consistencia:", getValue('hig-consistencia'), x2, y2);
+            y2 = addLine("Esteatosis:", getValue('hig-esteatosis'), x2, y2);
+            y = Math.max(y1, y2);
+            
+            addSubTitle("Valoración Global Aspecto Macroscópico");
+            y1 = y; y2 = y;
+            y1 = addLine("Antes de perfusión:", getValue('val-antes'), x, y1);
+            y2 = addLine("Después de perfusión:", getValue('val-despues'), x2, y2);
+            y = Math.max(y1, y2);
+
+            checkY(150); // Check if there is enough space for the next sections
+
+            addTitle("Perfusión, Banco e Incidencias");
+            y = addLine("Perfusión:", getValue('perfusion-resultado'));
+            y += sectionSpacing;
+            addMultiLine("Banco:", getCheckboxList('[id^="banco-"]:not(#banco-lesiones)'));
+            if (getCheckbox('banco-lesiones')) {
+                addMultiLine("Lesiones:", getValue('lesiones-detalle'));
+            }
+            y += sectionSpacing;
+            addMultiLine("Incidencias:", getValue('incidencias'));
+
+            addTitle("Tiempos");
+            y1 = y; y2 = y;
+            doc.setFontSize(11).setFont(undefined, 'bold').setTextColor(textColor).text("Donante Muerte Encefálica", x, y1);
+            y1 += lineHeight;
+            y1 = addLine("Inicio intervención:", getValue('t-me-inicio-int'), x, y1);
+            y1 = addLine("Inicio perfusión:", getValue('t-me-inicio-perf'), x, y1);
+            y1 = addLine("Fin perfusión:", getValue('t-me-fin-perf'), x, y1);
+            y1 = addLine("Extracción órgano:", getValue('t-me-extraccion'), x, y1);
+            y1 = addLine("Órgano en nevera:", getValue('t-me-nevera'), x, y1);
+
+            doc.setFontSize(11).setFont(undefined, 'bold').setTextColor(textColor).text("Donante en Asistolia", x2, y2);
+            y2 += lineHeight;
+            y2 = addLine("Inicio limitación:", getValue('t-as-inicio-lim'), x2, y2);
+            y2 = addLine("P.art sist. < 60:", getValue('t-as-pas'), x2, y2);
+            y2 = addLine("PCR:", getValue('t-as-pcr'), x2, y2);
+            y2 = addLine("Exitus:", getValue('t-as-exitus'), x2, y2);
+            y2 = addLine("Perf. normotérmica:", getValue('t-as-perf-normo'), x2, y2);
+            y2 = addLine("Inicio extracción:", getValue('t-as-inicio-ext'), x2, y2);
+            y2 = addLine("Inicio perf. fría:", getValue('t-as-inicio-perf-fria'), x2, y2);
+            y2 = addLine("Fin perf. fría:", getValue('t-as-fin-perf-fria'), x2, y2);
+            y2 = addLine("Extracción órgano:", getValue('t-as-extraccion'), x2, y2);
+            y2 = addLine("Órgano en nevera:", getValue('t-as-nevera'), x2, y2);
+            y = Math.max(y1, y2);
+
+            checkY(40);
+            y = pageHeight - 40;
+            addLine("Firma del cirujano:", "_________________________");
+
+            const pageCount = doc.internal.getNumberOfPages();
+            for(let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8).setTextColor(150).text(`Página ${i} de ${pageCount}`, 105, 290, { align: 'center' });
+            }
+
+            doc.save(`donante_${getValue('nhc') || 'SIN_NHC'}.pdf`);
+            showStatus("PDF generado con éxito", "success");
+        }
+    </script>
+</body>
+</html>
