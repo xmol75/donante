@@ -240,7 +240,7 @@
         #reset-button:hover:not(:disabled) { background-color: #d68910; }
 
         .hidden { display: none; }
-
+        
         /* Responsive */
         @media (max-width: 600px) {
             header h1 { font-size: 1.3em; }
@@ -530,7 +530,6 @@
                 <div class="action-buttons">
                     <button type="button" id="save-record-button">Guardar Registro</button>
                     <button type="button" id="generate-pdf-button">Generar PDF</button>
-                    <button type="button" id="delete-record-button">Borrar Registro</button>
                     <button type="button" id="reset-button">Limpiar para Nuevo Registro</button>
                 </div>
 
@@ -542,18 +541,6 @@
         </footer>
     </div>
     
-    <!-- Delete Confirmation Modal -->
-    <div id="delete-modal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h3>Confirmar Borrado</h3>
-            <p>¿Está seguro de que desea borrar este registro de forma permanente? Esta acción no se puede deshacer.</p>
-            <div class="modal-buttons">
-                <button id="cancel-delete-btn">Cancelar</button>
-                <button id="confirm-delete-btn">Sí, Borrar</button>
-            </div>
-        </div>
-    </div>
-
     <script type="module">
         // Firebase Imports from v11.10.0
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
@@ -577,10 +564,6 @@
         let recordsUnsubscribe = null;
         const form = document.getElementById('donante-form');
         const allFormElements = form.querySelectorAll('input, select, textarea');
-        const deleteModal = document.getElementById('delete-modal');
-        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
-        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
-        const deleteButton = document.getElementById('delete-record-button');
 
         // --- FIREBASE INITIALIZATION ---
         async function initializeFirebase() {
@@ -675,7 +658,7 @@
         }
 
         function populateForm(data) {
-            resetForm(); 
+            form.reset(); 
             allFormElements.forEach(el => {
                 if (el.id && data[el.id] !== undefined) {
                     if (el.type === 'checkbox') {
@@ -701,7 +684,6 @@
             }
             
             currentRecordId = docId;
-            deleteButton.disabled = false;
             
             try {
                 showStatus("Cargando registro...", 'info', 0);
@@ -737,34 +719,11 @@
                         createdAt: serverTimestamp()
                     });
                     currentRecordId = docRef.id;
-                    deleteButton.disabled = false;
                     showStatus(`Nuevo registro Nº ${data['numero-trasplante'] || '(sin número)'} guardado con éxito.`, 'success');
                 }
             } catch (error) {
                 console.error("Error saving record: ", error);
                 showStatus(`Error al guardar: ${error.message}`, 'error');
-            }
-        }
-
-        function handleDeleteRecord() {
-            if (!currentRecordId) {
-                showStatus("Por favor, seleccione un registro de la lista para borrarlo.", 'error');
-                return;
-            }
-            deleteModal.classList.remove('hidden');
-        }
-        
-        async function confirmDelete() {
-            if (!currentRecordId) return;
-            try {
-                await deleteDoc(doc(db, "donantes", currentRecordId));
-                showStatus("Registro borrado con éxito.", 'success');
-                resetForm();
-            } catch (error) {
-                console.error("Error deleting record: ", error);
-                showStatus(`Error al borrar: ${error.message}`, 'error');
-            } finally {
-                deleteModal.classList.add('hidden');
             }
         }
 
@@ -779,7 +738,6 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initializeFirebase();
-            deleteButton.disabled = true; // Disable delete button on start
 
             const accordions = document.getElementsByClassName("accordion-button");
             for (let i = 0; i < accordions.length; i++) {
@@ -868,17 +826,12 @@
             document.getElementById('save-record-button').addEventListener('click', handleSaveRecord);
             document.getElementById('generate-pdf-button').addEventListener('click', generatePDF);
             document.getElementById('reset-button').addEventListener('click', resetForm);
-            document.getElementById('delete-record-button').addEventListener('click', handleDeleteRecord);
-            confirmDeleteBtn.addEventListener('click', confirmDelete);
-            cancelDeleteBtn.addEventListener('click', () => deleteModal.classList.add('hidden'));
-
         });
 
         function resetForm() {
             document.getElementById('donante-form').reset();
             currentRecordId = null;
             document.getElementById('record-selector').value = "";
-            deleteButton.disabled = true;
             document.querySelectorAll('.hidden').forEach(el => {
                 if(el.id.includes('-container') || el.id.includes('-duracion') || el.id.includes('-temp')){
                     el.classList.add('hidden');
