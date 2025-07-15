@@ -238,6 +238,8 @@
         #generate-pdf-button:hover:not(:disabled) { background-color: #2980b9; }
         #reset-button { background-color: var(--warning-color); }
         #reset-button:hover:not(:disabled) { background-color: #d68910; }
+        #delete-record-button { background-color: var(--danger-color); }
+        #delete-record-button:hover:not(:disabled) { background-color: var(--danger-hover-color); }
 
         .hidden { display: none; }
         
@@ -268,6 +270,7 @@
             </div>
 
             <form id="donante-form">
+                <input type="hidden" id="current-record-id">
                 
                 <!-- Contenido del formulario original -->
                 <button type="button" class="accordion-button active">Datos Generales del Donante</button>
@@ -530,6 +533,7 @@
                 <div class="action-buttons">
                     <button type="button" id="save-record-button">Guardar Registro</button>
                     <button type="button" id="generate-pdf-button">Generar PDF</button>
+                    <button type="button" id="delete-record-button">Borrar Registro</button>
                     <button type="button" id="reset-button">Limpiar para Nuevo Registro</button>
                 </div>
 
@@ -564,6 +568,7 @@
         let recordsUnsubscribe = null;
         const form = document.getElementById('donante-form');
         const allFormElements = form.querySelectorAll('input, select, textarea');
+        const deleteButton = document.getElementById('delete-record-button');
 
         // --- FIREBASE INITIALIZATION ---
         async function initializeFirebase() {
@@ -684,6 +689,7 @@
             }
             
             currentRecordId = docId;
+            deleteButton.disabled = false;
             
             try {
                 showStatus("Cargando registro...", 'info', 0);
@@ -719,11 +725,32 @@
                         createdAt: serverTimestamp()
                     });
                     currentRecordId = docRef.id;
+                    deleteButton.disabled = false;
                     showStatus(`Nuevo registro Nº ${data['numero-trasplante'] || '(sin número)'} guardado con éxito.`, 'success');
                 }
             } catch (error) {
                 console.error("Error saving record: ", error);
                 showStatus(`Error al guardar: ${error.message}`, 'error');
+            }
+        }
+
+        async function handleDeleteRecord() {
+            if (!currentRecordId) {
+                showStatus("Por favor, seleccione un registro de la lista para borrarlo.", 'error');
+                return;
+            }
+            
+            const confirmed = window.confirm("¿Está seguro de que desea borrar este registro de forma permanente? Esta acción no se puede deshacer.");
+
+            if (confirmed) {
+                try {
+                    await deleteDoc(doc(db, "donantes", currentRecordId));
+                    showStatus("Registro borrado con éxito.", 'success');
+                    resetForm();
+                } catch (error) {
+                    console.error("Error deleting record: ", error);
+                    showStatus(`Error al borrar: ${error.message}`, 'error');
+                }
             }
         }
 
@@ -738,6 +765,7 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initializeFirebase();
+            deleteButton.disabled = true; // Disable delete button on start
 
             const accordions = document.getElementsByClassName("accordion-button");
             for (let i = 0; i < accordions.length; i++) {
@@ -826,12 +854,14 @@
             document.getElementById('save-record-button').addEventListener('click', handleSaveRecord);
             document.getElementById('generate-pdf-button').addEventListener('click', generatePDF);
             document.getElementById('reset-button').addEventListener('click', resetForm);
+            document.getElementById('delete-record-button').addEventListener('click', handleDeleteRecord);
         });
 
         function resetForm() {
             form.reset();
             currentRecordId = null;
             document.getElementById('record-selector').value = "";
+            deleteButton.disabled = true;
             document.querySelectorAll('.hidden').forEach(el => {
                 if(el.id.includes('-container') || el.id.includes('-duracion') || el.id.includes('-temp')){
                     el.classList.add('hidden');
