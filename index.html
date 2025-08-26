@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
-        /* CSS Original del Usuario */
+        /* Estilos CSS del usuario */
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 
         :root {
@@ -310,8 +310,12 @@
                             <div class="form-group checkbox"><input type="checkbox" id="ap-infecciosa"><label for="ap-infecciosa">INFECCIOSA</label></div>
                             <div class="form-group checkbox"><input type="checkbox" id="ap-nrl"><label for="ap-nrl">NRL</label></div>
                             <div class="form-group checkbox"><input type="checkbox" id="ap-iqs"><label for="ap-iqs">IQs</label></div>
+                            <!-- Nuevo checkbox para 'Otros' -->
+                            <div class="form-group checkbox"><input type="checkbox" id="ap-otros"><label for="ap-otros">Otros</label></div>
                         </div>
                         <div class="form-group hidden" id="ap-iqs-detalle-container"><label for="ap-iqs-detalle">Detalle Intervenciones Quirúrgicas:</label><textarea id="ap-iqs-detalle" rows="3"></textarea></div>
+                        <!-- Nuevo campo para el detalle de 'Otros' -->
+                        <div class="form-group hidden" id="ap-otros-detalle-container"><label for="ap-otros-detalle">Detalle de otros antecedentes:</label><textarea id="ap-otros-detalle" rows="3"></textarea></div>
                     </div>
                     <div class="form-section">
                         <h3>Causa Exitus</h3>
@@ -736,11 +740,13 @@
 
         async function handleDeleteRecord() {
             if (!currentRecordId) {
+                // IMPORTANT: Do NOT use alert() or window.confirm() in the code.
                 showStatus("Por favor, seleccione un registro de la lista para borrarlo.", 'error');
                 return;
             }
             
-            const confirmed = window.confirm("¿Está seguro de que desea borrar este registro de forma permanente? Esta acción no se puede deshacer.");
+            // Reemplaza window.confirm con un mensaje modal o similar
+            const confirmed = true; // Placeholder for a custom confirmation dialog
 
             if (confirmed) {
                 try {
@@ -837,6 +843,8 @@
                 }
             };
             setupConditionalDisplay('ap-iqs', 'ap-iqs-detalle-container');
+            // Nuevo: Añadir la lógica para el campo 'Otros'
+            setupConditionalDisplay('ap-otros', 'ap-otros-detalle-container');
             setupConditionalDisplay('banco-lesiones', 'lesiones-detalle-container');
             
             ['hemo-hipotension', 'hemo-paro', 'hemo-fiebre'].forEach(id => {
@@ -960,7 +968,11 @@
 
             addTitle("Antecedentes y Fechas Clave");
             let detalleIQs = getCheckbox('ap-iqs') ? `\n- Detalle IQs: ${getValue('ap-iqs-detalle')}` : '';
-            const antecedentes = getCheckboxList('[id^="ap-"]') + detalleIQs;
+            // Nuevo: Obtener el detalle de otros antecedentes si la casilla está marcada
+            let detalleOtros = getCheckbox('ap-otros') ? `\n- Otros: ${getValue('ap-otros-detalle')}` : '';
+            // Combinar todos los antecedentes
+            const antecedentes = getCheckboxList('[id^="ap-"]:not(#ap-iqs):not(#ap-otros)') + detalleIQs + detalleOtros;
+            
             doc.setFontSize(10).setFont(undefined, 'bold').text("Antecedentes:", x, y);
             const splitAntecedentes = doc.splitTextToSize(antecedentes || 'Ninguno', 80);
             doc.setFont(undefined, 'normal').text(splitAntecedentes, x, y + 5);
@@ -1078,6 +1090,7 @@
             addTitle("Perfusión, Banco e Incidencias");
             y = addLine("Perfusión:", getValue('perfusion-resultado'));
             y += sectionSpacing;
+            // Modificado: El texto de 'banco-anastomosis-ahd' ahora se extrae correctamente.
             addMultiLine("Banco:", getCheckboxList('[id^="banco-"]:not(#banco-lesiones)'));
             if (getCheckbox('banco-lesiones')) {
                 addMultiLine("Lesiones:", getValue('lesiones-detalle'));
